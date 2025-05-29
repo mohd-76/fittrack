@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitTrack</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-xl mx-auto bg-white p-6 rounded-2xl shadow-lg">
+    <h1 class="text-2xl font-bold text-center mb-4">FitTrack</h1>
+
+    <!-- User Selector -->
+    <label class="block mb-2 font-semibold">Select User:</label>
+    <select id="userSelect" class="w-full p-2 mb-4 border rounded">
+      <option value="you">You</option>
+      <option value="friend1">Friend 1</option>
+      <option value="friend2">Friend 2</option>
+    </select>
+
+    <!-- Workout Logger -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Workout Logger</h2>
+      <input id="workoutDate" type="date" class="w-full p-2 mb-2 border rounded" />
+      <input id="workoutType" placeholder="Push / Pull / Legs / Cardio" class="w-full p-2 mb-2 border rounded" />
+      <input id="exercise" placeholder="Exercise Name" class="w-full p-2 mb-2 border rounded" />
+      <div id="setsContainer" class="mb-2">
+        <div class="flex space-x-2 mb-2">
+          <input placeholder="Reps" type="number" class="reps w-1/2 p-2 border rounded" />
+          <input placeholder="Weight (kg)" type="number" class="weight w-1/2 p-2 border rounded" />
+        </div>
+      </div>
+      <button onclick="addSet()" class="mb-2 bg-gray-200 px-3 py-1 rounded">+ Add Set</button>
+      <textarea id="exerciseNote" placeholder="Notes about this exercise..." class="w-full p-2 mb-2 border rounded"></textarea>
+      <button onclick="saveExercise()" class="bg-blue-500 text-white px-4 py-2 rounded w-full">Add to Workout</button>
+    </div>
+
+    <!-- Workout Collection -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Selected Date's Workout Summary</h2>
+      <div id="dateTabs" class="flex flex-wrap gap-2 mb-4"></div>
+      <div id="todayWorkoutList" class="text-sm space-y-2"></div>
+      <button onclick="saveWorkoutDay()" class="mt-2 bg-green-500 text-white px-4 py-2 rounded w-full">Save Workout Day</button>
+    </div>
+  </div>
+
+  <script>
+    const users = ['you', 'friend1', 'friend2'];
+    let workoutLogsByDate = {};
+    let workoutTypesByDate = {};
+
+    function getSelectedDate() {
+      return document.getElementById('workoutDate').value || new Date().toISOString().split('T')[0];
+    }
+
+    function addSet() {
+      const container = document.getElementById('setsContainer');
+      const div = document.createElement('div');
+      div.className = 'flex space-x-2 mb-2';
+      div.innerHTML = `
+        <input placeholder="Reps" type="number" class="reps w-1/2 p-2 border rounded" />
+        <input placeholder="Weight (kg)" type="number" class="weight w-1/2 p-2 border rounded" />
+      `;
+      container.appendChild(div);
+    }
+
+    function saveExercise() {
+      const exerciseName = document.getElementById('exercise').value;
+      const repsInputs = document.querySelectorAll('.reps');
+      const weightInputs = document.querySelectorAll('.weight');
+      const note = document.getElementById('exerciseNote').value;
+      const sets = [];
+      for (let i = 0; i < repsInputs.length; i++) {
+        const reps = repsInputs[i].value;
+        const weight = weightInputs[i].value;
+        sets.push({ reps, weight });
+      }
+      const date = getSelectedDate();
+      if (!workoutLogsByDate[date]) workoutLogsByDate[date] = [];
+      workoutLogsByDate[date].push({ exercise: exerciseName, sets, note });
+
+      displayWorkoutForDate(date);
+      generateDateTabs();
+      document.getElementById('exercise').value = '';
+      document.getElementById('exerciseNote').value = '';
+      document.getElementById('setsContainer').innerHTML = `<div class="flex space-x-2 mb-2">
+        <input placeholder="Reps" type="number" class="reps w-1/2 p-2 border rounded" />
+        <input placeholder="Weight (kg)" type="number" class="weight w-1/2 p-2 border rounded" />
+      </div>`;
+    }
+
+    function displayWorkoutForDate(date) {
+      const container = document.getElementById('todayWorkoutList');
+      container.innerHTML = '';
+      const exercises = workoutLogsByDate[date] || [];
+      const workoutType = workoutTypesByDate[date] || '';
+      if (workoutType) {
+        const heading = document.createElement('h3');
+        heading.className = 'font-semibold';
+        heading.innerText = `Workout Type: ${workoutType}`;
+        container.appendChild(heading);
+      }
+      if (exercises.length > 0) {
+        const table = document.createElement('table');
+        table.className = 'w-full text-left border mt-2';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th class="border p-1">Exercise</th>
+              <th class="border p-1">Set</th>
+              <th class="border p-1">Reps</th>
+              <th class="border p-1">Weight</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+        exercises.forEach(ex => {
+          ex.sets.forEach((s, i) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td class="border p-1">${i === 0 ? ex.exercise : ''}</td>
+              <td class="border p-1">Set ${i + 1}</td>
+              <td class="border p-1">${s.reps}</td>
+              <td class="border p-1">${s.weight}</td>
+            `;
+            tbody.appendChild(row);
+          });
+        });
+        container.appendChild(table);
+      }
+    }
+
+    function saveWorkoutDay() {
+      const user = document.getElementById('userSelect').value;
+      const date = getSelectedDate();
+      const workoutType = document.getElementById('workoutType').value;
+      const key = `workouts-${user}`;
+      const history = JSON.parse(localStorage.getItem(key) || '[]');
+      const exercises = workoutLogsByDate[date] || [];
+      workoutTypesByDate[date] = workoutType;
+
+      const newEntry = { date, workoutType, exercises };
+      const existingIndex = history.findIndex(log => log.date === date);
+      if (existingIndex > -1) history[existingIndex] = newEntry;
+      else history.unshift(newEntry);
+
+      localStorage.setItem(key, JSON.stringify(history.slice(0, 30)));
+      generateDateTabs();
+      displayWorkoutForDate(date);
+    }
+
+    function generateDateTabs() {
+      const tabs = document.getElementById('dateTabs');
+      tabs.innerHTML = '';
+      const dates = Object.keys(workoutLogsByDate).sort().reverse();
+      dates.forEach(date => {
+        const btn = document.createElement('button');
+        const type = workoutTypesByDate[date] || '';
+        btn.innerText = `${date}${type ? ' (' + type + ')' : ''}`;
+        btn.className = 'px-3 py-1 bg-blue-100 rounded text-sm';
+        btn.onclick = () => {
+          document.getElementById('workoutDate').value = date;
+          document.getElementById('workoutType').value = type;
+          displayWorkoutForDate(date);
+        };
+        tabs.appendChild(btn);
+      });
+    }
+
+    document.getElementById('userSelect').addEventListener('change', (e) => {
+      const user = e.target.value;
+      const key = `workouts-${user}`;
+      const history = JSON.parse(localStorage.getItem(key) || '[]');
+      workoutLogsByDate = {};
+      workoutTypesByDate = {};
+      history.forEach(log => {
+        workoutLogsByDate[log.date] = log.exercises;
+        workoutTypesByDate[log.date] = log.workoutType;
+      });
+      generateDateTabs();
+      displayWorkoutForDate(getSelectedDate());
+    });
+
+    document.getElementById('workoutDate').addEventListener('change', (e) => {
+      const date = e.target.value;
+      document.getElementById('workoutType').value = workoutTypesByDate[date] || '';
+      displayWorkoutForDate(date);
+    });
+
+    const initUser = document.getElementById('userSelect').value;
+    const key = `workouts-${initUser}`;
+    const history = JSON.parse(localStorage.getItem(key) || '[]');
+    history.forEach(log => {
+      workoutLogsByDate[log.date] = log.exercises;
+      workoutTypesByDate[log.date] = log.workoutType;
+    });
+    generateDateTabs();
+    displayWorkoutForDate(getSelectedDate());
+  </script>
+</body>
+</html>
